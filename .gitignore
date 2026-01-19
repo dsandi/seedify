@@ -1,0 +1,30 @@
+# Output files
+output/
+!output/.gitkeep
+
+# Docker volumes
+docker/postgres_data/
+
+# Node modules
+node_modules/
+
+# Debug output (per user rules)
+debug-output/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
