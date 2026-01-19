@@ -39,6 +39,7 @@ npx seedify install  # Requires Java 11+
 
 ```bash
 npx seedify generate ./queries.jsonl \
+  --db-host your-staging-db.com \
   --db-name your_db \
   --db-user postgres \
   --db-password secret
@@ -49,8 +50,9 @@ Output: `./output/seed.sql`
 ## CLI Commands
 
 ```bash
-seedify generate <queries.jsonl> [options]  # Main command
+seedify generate <queries.jsonl> [options]  # Analyze + generate subset
 seedify install                             # Install Jailer
+seedify uninstall                           # Remove Jailer
 seedify check                               # Check environment
 ```
 
@@ -59,12 +61,12 @@ seedify check                               # Check environment
 | Option | Description |
 |--------|-------------|
 | `-o, --output` | Output SQL file (default: `./output/seed.sql`) |
-| `--db-url` | PostgreSQL URL |
-| `--db-host` | Host (default: localhost) |
-| `--db-port` | Port (default: 5432) |
+| `--db-url` | PostgreSQL URL (e.g., `postgresql://user:pass@host/db`) |
+| `--db-host` | Database host (default: `localhost`) |
+| `--db-port` | Database port (default: `5432`) |
 | `--db-name` | Database name (required) |
-| `--db-user` | Username (required) |
-| `--db-password` | Password |
+| `--db-user` | Database username (required) |
+| `--db-password` | Database password |
 
 ## API
 
@@ -73,7 +75,7 @@ const seedify = require('seedify');
 
 // Capture
 seedify.start();
-seedify.dump('./queries.jsonl');
+await seedify.dump('./queries.jsonl');
 seedify.stop();
 
 // Analyze (if needed separately)

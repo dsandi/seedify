@@ -158,5 +158,32 @@ describe('Query Analyzer', function () {
                 c.values.includes(20)
             ));
         });
+
+        it('should extract non-ID column conditions like inv_receipt', function () {
+            // Regression test: columns that don't end with "id" should still be captured
+            const query = 'SELECT inv_pk FROM invoices WHERE inv_receipt = $1;';
+            const params = [123];
+            const conditions = extractIdConditions(query, params);
+
+            assert.ok(conditions.some(c =>
+                c.column === 'inv_receipt' &&
+                c.values.includes(123)
+            ), 'Should extract inv_receipt condition even though it does not look like an ID column');
+        });
+
+        it('should extract arbitrary column names', function () {
+            const query = 'SELECT * FROM products WHERE sku = $1 AND category_code = $2';
+            const params = ['ABC123', 'ELEC'];
+            const conditions = extractIdConditions(query, params);
+
+            assert.ok(conditions.some(c =>
+                c.column === 'sku' &&
+                c.values.includes('ABC123')
+            ));
+            assert.ok(conditions.some(c =>
+                c.column === 'category_code' &&
+                c.values.includes('ELEC')
+            ));
+        });
     });
 });

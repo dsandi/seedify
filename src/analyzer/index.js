@@ -91,7 +91,7 @@ function extractIdConditions(query, params) {
         const column = match[1];
         const paramIndex = parseInt(match[2], 10) - 1;
 
-        if (isIdColumn(column) && params[paramIndex] !== undefined) {
+        if (params[paramIndex] !== undefined) {
             conditions.push({
                 table: null,
                 column: column.toLowerCase(),
@@ -106,7 +106,7 @@ function extractIdConditions(query, params) {
         const column = match[2];
         const paramIndex = parseInt(match[3], 10) - 1;
 
-        if (isIdColumn(column) && params[paramIndex] !== undefined) {
+        if (params[paramIndex] !== undefined) {
             conditions.push({
                 table,
                 column: column.toLowerCase(),
@@ -121,7 +121,7 @@ function extractIdConditions(query, params) {
         const paramsStr = match[2];
 
         const paramMatches = paramsStr.match(/\$(\d+)/g);
-        if (paramMatches && isIdColumn(column)) {
+        if (paramMatches) {
             const values = paramMatches.map(p => {
                 const idx = parseInt(p.slice(1), 10) - 1;
                 return params[idx];
@@ -144,7 +144,7 @@ function extractIdConditions(query, params) {
         const paramsStr = match[3];
 
         const paramMatches = paramsStr.match(/\$(\d+)/g);
-        if (paramMatches && isIdColumn(column)) {
+        if (paramMatches) {
             const values = paramMatches.map(p => {
                 const idx = parseInt(p.slice(1), 10) - 1;
                 return params[idx];
@@ -172,7 +172,7 @@ function extractIdConditions(query, params) {
         const paramIndex = parseInt(match[2], 10) - 1;
         const paramValue = params[paramIndex];
 
-        if (isIdColumn(column) && paramValue !== undefined) {
+        if (paramValue !== undefined) {
             // ANY takes an array parameter, so flatten it
             const values = Array.isArray(paramValue) ? paramValue : [paramValue];
             conditions.push({
@@ -190,7 +190,7 @@ function extractIdConditions(query, params) {
         const paramIndex = parseInt(match[3], 10) - 1;
         const paramValue = params[paramIndex];
 
-        if (isIdColumn(column) && paramValue !== undefined) {
+        if (paramValue !== undefined) {
             const values = Array.isArray(paramValue) ? paramValue : [paramValue];
             conditions.push({
                 table,
