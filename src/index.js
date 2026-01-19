@@ -18,5 +18,7 @@ module.exports = {
     start: capturer.start,
     stop: capturer.stop,
     dump: capturer.dump,
+    getQueries: capturer.getQueries,
+    clear: capturer.clear,
     analyzeFile: analyzer.analyzeFile
 };

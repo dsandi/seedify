@@ -17,7 +17,10 @@ npm install seedify
 const seedify = require('seedify');
 
 before(() => seedify.start());
-after(() => seedify.dump('./queries.jsonl'));
+
+after(async () => {
+  await seedify.dump('./queries.jsonl');
+});
 ```
 
 ### 2. Run your tests
