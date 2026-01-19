@@ -112,10 +112,12 @@ Generate Options:
   --db-name <name>        Database name (required)
   --db-user <user>        Database user (required)
   --db-password <pass>    Database password
+  --db-ssl                Enable SSL (use with self-signed certs)
 
 Examples:
   seedify generate ./queries.jsonl --db-name mydb --db-user postgres
   seedify generate ./queries.jsonl --db-url postgresql://user:pass@host/db
+  seedify generate ./queries.jsonl --db-name mydb --db-user postgres --db-ssl
 `);
 }
 
@@ -192,7 +194,10 @@ async function runGenerate(args) {
     // Step 3: Build Jailer data model
     log.stepStart('Building database model with Jailer...');
 
-    const jdbcUrl = `jdbc:postgresql://${options.dbHost}:${options.dbPort}/${options.dbName}`;
+    let jdbcUrl = `jdbc:postgresql://${options.dbHost}:${options.dbPort}/${options.dbName}`;
+    if (options.dbSsl) {
+        jdbcUrl += '?ssl=true&sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory';
+    }
     const tempDir = path.join(require('os').tmpdir(), 'seedify-' + Date.now());
     const dataModelDir = path.join(tempDir, 'datamodel');
 
@@ -252,7 +257,8 @@ function parseArgs(args) {
         dbPort: process.env.DB_PORT || '5432',
         dbName: process.env.DB_NAME || null,
         dbUser: process.env.DB_USER || null,
-        dbPassword: process.env.DB_PASSWORD || ''
+        dbPassword: process.env.DB_PASSWORD || '',
+        dbSsl: process.env.DB_SSL === 'true' || false
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -285,6 +291,7 @@ function parseArgs(args) {
             case '--db-name': options.dbName = next; i++; break;
             case '--db-user': options.dbUser = next; i++; break;
             case '--db-password': options.dbPassword = next; i++; break;
+            case '--db-ssl': options.dbSsl = true; break;
         }
     }
 
