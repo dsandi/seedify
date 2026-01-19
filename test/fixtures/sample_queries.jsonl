@@ -1,0 +1,3 @@
+{"query":"BEGIN","params":[],"timestamp":1768794776478}
+{"query":"SELECT inv_pk FROM invoices WHERE inv_receipt = $1;","params":[123],"timestamp":1768794776626}
+{"query":"ROLLBACK","params":[],"timestamp":1768794776779}
