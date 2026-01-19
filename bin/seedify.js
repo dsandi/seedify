@@ -80,6 +80,9 @@ async function main() {
         case 'install':
             await runInstall();
             break;
+        case 'uninstall':
+            await runUninstall();
+            break;
         case 'check':
             await runCheck();
             break;
@@ -97,6 +100,7 @@ Seedify - Generate minimal test database seeders
 Usage:
   seedify generate <queries.jsonl> [options]    Analyze + generate subset
   seedify install                               Install Jailer locally
+  seedify uninstall                             Remove Jailer installation
   seedify check                                 Check environment
 
 Generate Options:
@@ -300,17 +304,19 @@ async function runInstall() {
         log.error('Java not found');
         log.info('Install Java 11+:');
         log.info('  macOS:  brew install openjdk@17');
+        log.info('          Then: sudo ln -sfn $(brew --prefix openjdk@17)/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk');
         log.info('  Ubuntu: sudo apt install openjdk-17-jdk');
         process.exit(1);
     }
 
     // Step 2: Check if already installed
     log.stepStart('Checking existing installation...');
-    const jailerPath = path.join(JAILER_HOME, 'jailer.sh');
+    const jailerScript = path.join(JAILER_HOME, 'jailer.sh');
     try {
-        await fs.access(jailerPath);
+        await fs.access(jailerScript);
         log.success(`Already installed at: ${JAILER_HOME}`);
-        log.info('To reinstall, delete the directory first');
+        log.info('To reinstall, delete the directory first:');
+        log.info(`  rm -rf "${JAILER_HOME}"`);
         return;
     } catch {
         log.info('Not installed, proceeding...');
@@ -332,22 +338,50 @@ async function runInstall() {
         log.info('Extracting...');
         execSync(`unzip -o "${zipPath}" -d "${JAILER_HOME}"`, { stdio: 'pipe' });
 
-        // Move from nested dir
-        const extractedDir = path.join(JAILER_HOME, `jailer_${JAILER_VERSION}`);
-        const files = await fs.readdir(extractedDir);
-        for (const file of files) {
-            await fs.rename(path.join(extractedDir, file), path.join(JAILER_HOME, file));
+        // Find the extracted directory (could be jailer_X.X.X or jailer-X.X.X or similar)
+        const entries = await fs.readdir(JAILER_HOME, { withFileTypes: true });
+        const extractedDir = entries.find(e => e.isDirectory() && e.name.startsWith('jailer'));
+
+        if (extractedDir) {
+            const extractedPath = path.join(JAILER_HOME, extractedDir.name);
+            log.info(`Found: ${extractedDir.name}`);
+
+            // Move contents up one level
+            const files = await fs.readdir(extractedPath);
+            for (const file of files) {
+                const src = path.join(extractedPath, file);
+                const dest = path.join(JAILER_HOME, file);
+                await fs.rename(src, dest);
+            }
+            await fs.rmdir(extractedPath);
         }
-        await fs.rmdir(extractedDir);
+
+        // Clean up zip
         await fs.unlink(zipPath);
 
+        // Make scripts executable on Unix
         if (process.platform !== 'win32') {
-            execSync(`chmod +x "${JAILER_HOME}"/*.sh`);
+            try {
+                execSync(`chmod +x "${JAILER_HOME}"/*.sh`, { stdio: 'pipe' });
+            } catch {
+                // Ignore chmod errors
+            }
         }
 
-        log.success(`Installed to: ${JAILER_HOME}`);
+        // Verify installation
+        try {
+            await fs.access(jailerScript);
+            log.success(`Installed to: ${JAILER_HOME}`);
+        } catch {
+            log.error('Installation incomplete - jailer.sh not found');
+            log.info(`Check contents of: ${JAILER_HOME}`);
+            process.exit(1);
+        }
     } catch (e) {
         log.error(`Installation failed: ${e.message}`);
+        log.info(`Try manually:`);
+        log.info(`  1. Download: ${downloadUrl}`);
+        log.info(`  2. Extract to: ${JAILER_HOME}`);
         process.exit(1);
     }
 
@@ -355,27 +389,47 @@ async function runInstall() {
 }
 
 async function runCheck() {
-    console.log('\nSeedify Environment Check\n');
+    log.header('Seedify - Environment Check');
 
     // Java
-    process.stdout.write('Java:     ');
+    log.info('Java:');
     try {
         const v = execSync('java -version 2>&1').toString().split('\n')[0];
-        console.log(`✓ ${v}`);
+        log.success(v);
     } catch {
-        console.log('✗ Not installed');
+        log.error('Not installed');
     }
 
     // Jailer
-    process.stdout.write('Jailer:   ');
+    log.info('Jailer:');
     try {
         await fs.access(path.join(JAILER_HOME, 'jailer.sh'));
-        console.log(`✓ ${JAILER_HOME}`);
+        log.success(`Installed at ${JAILER_HOME}`);
     } catch {
-        console.log('✗ Run: seedify install');
+        log.error('Not installed. Run: seedify install');
+    }
+}
+
+async function runUninstall() {
+    log.header('Seedify - Uninstalling Jailer');
+
+    try {
+        await fs.access(JAILER_HOME);
+    } catch {
+        log.info('Jailer is not installed.');
+        return;
     }
 
-    console.log('');
+    log.info(`Removing: ${JAILER_HOME}`);
+
+    try {
+        await fs.rm(JAILER_HOME, { recursive: true, force: true });
+        log.success('Jailer uninstalled successfully.');
+    } catch (e) {
+        log.error(`Failed to remove: ${e.message}`);
+        log.info(`Try manually: rm -rf "${JAILER_HOME}"`);
+        process.exit(1);
+    }
 }
 
 main().catch(err => {
