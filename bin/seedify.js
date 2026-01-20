@@ -193,41 +193,24 @@ async function runGenerate(args) {
     log.stepStart('Building database model with Jailer...');
 
     const jdbcUrl = `jdbc:postgresql://${options.dbHost}:${options.dbPort}/${options.dbName}`;
-    const tempDir = path.join(require('os').tmpdir(), 'seedify-' + Date.now());
-    const dataModelDir = path.join(tempDir, 'datamodel');
 
-    // Add PostgreSQL driver to classpath via environment variable
-    const libDir = path.join(JAILER_HOME, 'lib');
-    const pgDriver = path.join(libDir, 'postgresql-42.7.4.jar');
-    const jailerJar = path.join(JAILER_HOME, 'jailer.jar');
-
-    // Build custom CLASSPATH that includes the PostgreSQL driver
-    const existingClasspath = process.env.CLASSPATH || '';
-    const classpathSep = process.platform === 'win32' ? ';' : ':';
-    const newClasspath = existingClasspath
-        ? `${pgDriver}${classpathSep}${existingClasspath}`
-        : pgDriver;
-
-    const jailerEnv = {
-        ...process.env,
-        CLASSPATH: newClasspath
-    };
+    // Use local .seedify directory for temp files instead of system temp
+    const seedifyDir = path.join(process.cwd(), '.seedify');
+    const dataModelDir = path.join(seedifyDir, 'datamodel');
 
     try {
-        await fs.mkdir(tempDir, { recursive: true });
+        await fs.mkdir(dataModelDir, { recursive: true });
 
-        // Use jailer.sh with CLASSPATH env var that includes PostgreSQL driver
+        // jailer.sh is patched during install to include PostgreSQL driver
         const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
         execSync(buildCmd, {
             cwd: JAILER_HOME,
-            stdio: 'pipe',
-            env: jailerEnv
+            stdio: 'pipe'
         });
         log.success('Database model built');
     } catch (e) {
         log.error('Failed to connect/analyze database');
         if (e.stderr) log.info(`Stderr: ${e.stderr.toString()}`);
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
         process.exit(1);
     }
 
@@ -241,13 +224,11 @@ async function runGenerate(args) {
     await fs.mkdir(path.dirname(outputFileAbs), { recursive: true }).catch(() => { });
 
     try {
-        // Use jailer.sh with CLASSPATH env var
         const extractCmd = `"${jailerPath}" export -datamodel "${dataModelDir}" -e "${outputFileAbs}" -where "${firstCond.condition}" -format SQL "${firstCond.table}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
 
         execSync(extractCmd, {
             cwd: JAILER_HOME,
-            stdio: 'pipe',
-            env: jailerEnv
+            stdio: 'pipe'
         });
 
         const stat = await fs.stat(outputFileAbs);
@@ -260,12 +241,8 @@ async function runGenerate(args) {
         log.error('Jailer extraction failed');
         log.info(e.message);
         if (e.stderr) log.info(`Stderr: ${e.stderr.toString()}`);
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
         process.exit(1);
     }
-
-    // Cleanup
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
 
     log.footer('Done! Seeder file generated successfully!');
 }
@@ -432,6 +409,24 @@ async function runInstall() {
         }
 
         log.success(`PostgreSQL driver installed: postgresql-${pgDriverVersion}.jar`);
+
+        // Patch jailer.sh to include PostgreSQL driver in classpath
+        log.info('Patching jailer.sh to include PostgreSQL driver...');
+        const jailerShPath = path.join(JAILER_HOME, 'jailer.sh');
+        let jailerSh = await fs.readFile(jailerShPath, 'utf-8');
+
+        // Add the PostgreSQL driver to the classpath after the existing CP= line
+        // Look for the line where CP is set and add our driver
+        if (!jailerSh.includes('postgresql-')) {
+            // Find the first CP= assignment and add our driver after it
+            const cpPattern = /^(CP=.*)$/m;
+            const driverLine = `\n# PostgreSQL JDBC driver (added by seedify)\nCP=$CP:$LIB/postgresql-${pgDriverVersion}.jar`;
+            jailerSh = jailerSh.replace(cpPattern, `$1${driverLine}`);
+            await fs.writeFile(jailerShPath, jailerSh);
+            log.success('jailer.sh patched');
+        } else {
+            log.success('jailer.sh already patched');
+        }
     } catch (e) {
         log.error(`Failed to download PostgreSQL driver: ${e.message}`);
         log.info('You can manually download from:');
