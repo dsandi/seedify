@@ -112,12 +112,10 @@ Generate Options:
   --db-name <name>        Database name (required)
   --db-user <user>        Database user (required)
   --db-password <pass>    Database password
-  --db-ssl                Enable SSL (use with self-signed certs)
 
 Examples:
   seedify generate ./queries.jsonl --db-name mydb --db-user postgres
   seedify generate ./queries.jsonl --db-url postgresql://user:pass@host/db
-  seedify generate ./queries.jsonl --db-name mydb --db-user postgres --db-ssl
 `);
 }
 
@@ -132,7 +130,7 @@ async function runGenerate(args) {
     }
 
     if (!options.dbName || !options.dbUser) {
-        console.error('ERROR: Database name and user required');
+        console.error('ERROR: Database connection required');
         console.error('Use: --db-name <name> --db-user <user>');
         console.error('Or:  --db-url postgresql://user:pass@host/db');
         process.exit(1);
@@ -194,24 +192,24 @@ async function runGenerate(args) {
     // Step 3: Build Jailer data model
     log.stepStart('Building database model with Jailer...');
 
-    let jdbcUrl = `jdbc:postgresql://${options.dbHost}:${options.dbPort}/${options.dbName}`;
-    if (options.dbSsl) {
-        jdbcUrl += '?ssl=true&sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory';
-    }
+    const jdbcUrl = `jdbc:postgresql://${options.dbHost}:${options.dbPort}/${options.dbName}`;
     const tempDir = path.join(require('os').tmpdir(), 'seedify-' + Date.now());
     const dataModelDir = path.join(tempDir, 'datamodel');
 
     try {
         await fs.mkdir(tempDir, { recursive: true });
 
-        execSync(
-            `"${jailerPath}" build-model "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}" "${dataModelDir}"`,
-            { cwd: JAILER_HOME, stdio: 'pipe' }
-        );
+        // Syntax: build-model [-datamodel <dir>] <driver> <url> <user> <password>
+        const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        execSync(buildCmd, {
+            cwd: JAILER_HOME,
+            stdio: 'pipe',
+            env: { ...process.env, JAVA_OPTS: '-Xmx1024M' }
+        });
         log.success('Database model built');
     } catch (e) {
-        log.error('Failed to connect to database');
-        log.info('Check your connection details and try again');
+        log.error('Failed to connect/analyze database');
+        if (e.stderr) log.info(`Stderr: ${e.stderr.toString()}`);
         await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
         process.exit(1);
     }
@@ -222,16 +220,22 @@ async function runGenerate(args) {
     const firstCond = jailerConditions[0];
     log.info(`Subject: ${firstCond.table} WHERE ${firstCond.condition}`);
 
+    const outputFileAbs = path.resolve(options.outputFile);
+    await fs.mkdir(path.dirname(outputFileAbs), { recursive: true }).catch(() => { });
+
     try {
-        await fs.mkdir(path.dirname(options.outputFile), { recursive: true });
+        // Syntax: export [options] <subject> <driver> <url> <user> <password>
+        // Options: -datamodel <dir> -e <outfile> -where <cond> -format SQL
+        const extractCmd = `"${jailerPath}" export -datamodel "${dataModelDir}" -e "${outputFileAbs}" -where "${firstCond.condition}" -format SQL "${firstCond.table}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
 
-        execSync(
-            `"${jailerPath}" export -e "${dataModelDir}" -where "${firstCond.condition}" -format SQL "${firstCond.table}" "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}" "${options.outputFile}"`,
-            { cwd: JAILER_HOME, stdio: 'pipe' }
-        );
+        execSync(extractCmd, {
+            cwd: JAILER_HOME,
+            stdio: 'pipe',
+            env: { ...process.env, JAVA_OPTS: '-Xmx1024M' }
+        });
 
-        const stat = await fs.stat(options.outputFile);
-        const content = await fs.readFile(options.outputFile, 'utf-8');
+        const stat = await fs.stat(outputFileAbs);
+        const content = await fs.readFile(outputFileAbs, 'utf-8');
         const lines = content.split('\n').length;
 
         log.success(`Generated: ${options.outputFile}`);
@@ -239,6 +243,7 @@ async function runGenerate(args) {
     } catch (e) {
         log.error('Jailer extraction failed');
         log.info(e.message);
+        if (e.stderr) log.info(`Stderr: ${e.stderr.toString()}`);
         await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
         process.exit(1);
     }
@@ -257,8 +262,7 @@ function parseArgs(args) {
         dbPort: process.env.DB_PORT || '5432',
         dbName: process.env.DB_NAME || null,
         dbUser: process.env.DB_USER || null,
-        dbPassword: process.env.DB_PASSWORD || '',
-        dbSsl: process.env.DB_SSL === 'true' || false
+        dbPassword: process.env.DB_PASSWORD || ''
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -291,7 +295,6 @@ function parseArgs(args) {
             case '--db-name': options.dbName = next; i++; break;
             case '--db-user': options.dbUser = next; i++; break;
             case '--db-password': options.dbPassword = next; i++; break;
-            case '--db-ssl': options.dbSsl = true; break;
         }
     }
 

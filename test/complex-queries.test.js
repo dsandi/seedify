@@ -240,11 +240,38 @@ describe('Complex Query Handling', function () {
             // Should find multiple tables
             assert.ok(analysis.tables.length >= 3, `Expected at least 3 tables, got ${analysis.tables.length}`);
 
-            // Should extract conditions from the simpler queries
-            assert.ok(analysis.conditions.length > 0, 'Should extract at least one condition');
+            // Verify exact conditions are extracted from the queries:
+            // Query 1: complexQuery has "WHERE u.username = 'alice'" (string literal)
+            const usernameCondition = analysis.conditions.find(c => c.column === 'username');
+            assert.ok(usernameCondition, 'Should extract username condition from complex CTE query');
+            assert.ok(usernameCondition.values.includes('alice'),
+                `Expected username values to include 'alice', got: ${usernameCondition.values}`);
 
-            // Should generate Jailer conditions
-            assert.ok(jailerConditions.length > 0, 'Should generate at least one Jailer condition');
+            // Query 2: "SELECT * FROM orders WHERE status = $1" with params: ['pending']
+            const statusCondition = analysis.conditions.find(c => c.column === 'status');
+            assert.ok(statusCondition, 'Should extract status condition');
+            assert.ok(statusCondition.values.includes('pending'),
+                `Expected status values to include 'pending', got: ${statusCondition.values}`);
+
+            // Query 3: "SELECT * FROM users WHERE id = $1" with params: [123]
+            const idCondition = analysis.conditions.find(c => c.column === 'id');
+            assert.ok(idCondition, 'Should extract id condition');
+            assert.ok(idCondition.values.includes(123),
+                `Expected id values to include 123, got: ${idCondition.values}`);
+
+            // Verify Jailer conditions are generated correctly
+            assert.ok(jailerConditions.length >= 3, `Expected at least 3 Jailer conditions, got ${jailerConditions.length}`);
+
+            // Check specific Jailer condition formats
+            const statusJailer = jailerConditions.find(c => c.condition.includes('status'));
+            assert.ok(statusJailer, 'Should generate Jailer condition for status');
+            assert.strictEqual(statusJailer.condition, "status = 'pending'",
+                `Expected status condition to be "status = 'pending'", got: ${statusJailer.condition}`);
+
+            const idJailer = jailerConditions.find(c => c.condition.includes('id ='));
+            assert.ok(idJailer, 'Should generate Jailer condition for id');
+            assert.strictEqual(idJailer.condition, 'id = 123',
+                `Expected id condition to be "id = 123", got: ${idJailer.condition}`);
         });
     });
 });
