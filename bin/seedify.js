@@ -292,6 +292,9 @@ ${firstCond.table}; ${firstCond.condition}
 
         log.success(`Generated: ${outputFileAbs}`);
         log.success(`Size: ${(stat.size / 1024).toFixed(1)} KB (${lines} lines)`);
+
+        // Clean up temp files
+        await fs.rm(path.join(seedifyDir, 'tmp'), { recursive: true, force: true }).catch(() => { });
     } catch (e) {
         log.error('Jailer extraction failed');
         log.info(e.message);
