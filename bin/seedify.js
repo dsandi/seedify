@@ -160,7 +160,7 @@ async function runGenerate(args) {
     }
 
     log.info(`Database: ${options.dbHost}:${options.dbPort}/${options.dbName}`);
-    log.info(`Output: ${options.outputFile}`);
+    log.info(`Output: ./seedify/${options.outputFile}`);
 
     // Step 2: Analyze queries
     log.stepStart('Analyzing captured queries...');
@@ -240,8 +240,8 @@ ${firstCond.table}; ${firstCond.condition}
     await fs.writeFile(extractionModelPath, extractionModel);
 
     try {
-        // Use -scope LOCAL to avoid creating temp tables in source database (for read-only users)
-        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -scope LOCAL org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        // Use -local-database-storage to avoid creating temp tables in source database (for read-only users)
+        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -local-database-storage org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
 
         execSync(extractCmd, {
             cwd: seedifyDir,
