@@ -202,9 +202,10 @@ async function runGenerate(args) {
         await fs.mkdir(dataModelDir, { recursive: true });
 
         // jailer.sh is patched during install to include PostgreSQL driver
+        // Run from seedifyDir so all relative paths are consistent
         const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
         execSync(buildCmd, {
-            cwd: JAILER_HOME,
+            cwd: seedifyDir,
             stdio: 'pipe'
         });
         log.success('Database model built');
@@ -227,7 +228,7 @@ async function runGenerate(args) {
         const extractCmd = `"${jailerPath}" export -datamodel "${dataModelDir}" -e "${outputFileAbs}" -where "${firstCond.condition}" -format SQL "${firstCond.table}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
 
         execSync(extractCmd, {
-            cwd: JAILER_HOME,
+            cwd: seedifyDir,
             stdio: 'pipe'
         });
 
