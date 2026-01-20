@@ -16,29 +16,23 @@ npm install seedify
 // test/setup.js
 const seedify = require('seedify');
 
-before(() => seedify.start());
+beforeAll(() => seedify.start());
 
-after(async () => {
-  await seedify.dump('./queries.jsonl');
+afterAll(async () => {
+  await seedify.dump();  // Writes to .seedify/queries.jsonl
 });
 ```
 
-### 2. Run your tests
-
-```bash
-npm test  # Creates queries.jsonl
-```
-
-### 3. Install Jailer (one-time)
+### 2. Install Jailer (one-time)
 
 ```bash
 npx seedify install  # Requires Java 11+
 ```
 
-### 4. Generate seeder
+### 3. Generate seeder
 
 ```bash
-npx seedify generate ./queries.jsonl \
+npx seedify generate .seedify/queries.jsonl \
   --db-host your-staging-db.com \
   --db-name your_db \
   --db-user postgres \
@@ -75,11 +69,11 @@ const seedify = require('seedify');
 
 // Capture
 seedify.start();
-await seedify.dump('./queries.jsonl');
+await seedify.dump();
 seedify.stop();
 
 // Analyze (if needed separately)
-const analysis = await seedify.analyzeFile('./queries.jsonl');
+const analysis = await seedify.analyzeFile('.seedify/queries.jsonl');
 ```
 
 ## Supported Patterns

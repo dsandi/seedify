@@ -229,13 +229,13 @@ async function runGenerate(args) {
         : path.resolve(options.outputFile);
     await fs.mkdir(path.dirname(outputFileAbs), { recursive: true }).catch(() => { });
 
-    // Create extraction model file (.jm) that Jailer expects
-    const extractionModelPath = path.join(seedifyDir, 'extraction.jm');
-    const extractionModel = `<?xml version="1.0" encoding="UTF-8"?>
-<jailer-extraction-model>
-    <subject>${firstCond.table}</subject>
-    <condition>${firstCond.condition}</condition>
-</jailer-extraction-model>`;
+    // Create extraction model file (.csv) that Jailer expects
+    // Format: subject table on first line, where condition on second line
+    const extractionModelPath = path.join(seedifyDir, 'extraction.csv');
+    const extractionModel = `# Seedify extraction model
+# subject; where
+${firstCond.table}; ${firstCond.condition}
+`;
     await fs.writeFile(extractionModelPath, extractionModel);
 
     try {

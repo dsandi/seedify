@@ -95,21 +95,24 @@ function clear() {
  * Dump captured queries to a JSONL file.
  * Each line is a JSON object with query, params, and timestamp.
  * 
- * @param {string} filePath - Path to output file
+ * @param {string} [filePath] - Path to output file (default: .seedify/queries.jsonl)
  */
 async function dump(filePath) {
     const fs = require('fs').promises;
     const path = require('path');
 
+    // Default to .seedify/queries.jsonl in current working directory
+    const outputPath = filePath || path.join(process.cwd(), '.seedify', 'queries.jsonl');
+
     // Ensure directory exists
-    const dir = path.dirname(filePath);
+    const dir = path.dirname(outputPath);
     await fs.mkdir(dir, { recursive: true });
 
     // Write as JSONL (one JSON object per line)
     const lines = capturedQueries.map(q => JSON.stringify(q));
-    await fs.writeFile(filePath, lines.join('\n') + '\n');
+    await fs.writeFile(outputPath, lines.join('\n') + '\n');
 
-    console.log(`[seedify] Dumped ${capturedQueries.length} queries to ${filePath}`);
+    console.log(`[seedify] Dumped ${capturedQueries.length} queries to ${outputPath}`);
 }
 
 module.exports = {
