@@ -94,6 +94,30 @@ const analysis = await seedify.analyzeFile('.seedify/queries.jsonl');
 | String literals | `WHERE username = 'alice'` |
 | Numeric literals | `WHERE status = 1` |
 
+## Manual Script
+
+For debugging or running steps individually, use `seedify-manual.sh`:
+
+```bash
+# Make executable
+chmod +x seedify-manual.sh
+
+# Set environment variables and run
+DB_HOST=your-host DB_NAME=your_db DB_USER=your_user DB_PASSWORD=secret ./seedify-manual.sh
+```
+
+The script runs these steps:
+1. `npx seedify analyze` - Extracts table/conditions from queries.jsonl
+2. `jailer.sh build-model` - Analyzes database schema
+3. Creates `extraction.csv` - Tells Jailer what to extract
+4. `jailer.sh export` - Exports the data subset
+
+You can also use the analyze command standalone:
+
+```bash
+npx seedify analyze .seedify/queries.jsonl
+```
+
 ## License
 
 MIT

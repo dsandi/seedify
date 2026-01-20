@@ -77,6 +77,9 @@ async function main() {
         case 'generate':
             await runGenerate(args.slice(1));
             break;
+        case 'analyze':
+            await runAnalyze(args.slice(1));
+            break;
         case 'install':
             await runInstall();
             break;
@@ -99,6 +102,7 @@ Seedify - Generate minimal test database seeders
 
 Usage:
   seedify generate <queries.jsonl> [options]    Analyze + generate subset
+  seedify analyze <queries.jsonl>               Analyze queries and output conditions (JSON)
   seedify install                               Install Jailer locally
   seedify uninstall                             Remove Jailer installation
   seedify check                                 Check environment
@@ -112,11 +116,40 @@ Generate Options:
   --db-name <name>        Database name (required)
   --db-user <user>        Database user (required)
   --db-password <pass>    Database password
+  --debug                 Show verbose Jailer output
 
 Examples:
   seedify generate ./queries.jsonl --db-name mydb --db-user postgres
   seedify generate ./queries.jsonl --db-url postgresql://user:pass@host/db
+  seedify analyze .seedify/queries.jsonl
 `);
+}
+
+async function runAnalyze(args) {
+    const inputFile = args[0];
+
+    if (!inputFile) {
+        console.error('ERROR: Queries file required');
+        console.error('Usage: seedify analyze <queries.jsonl>');
+        process.exit(1);
+    }
+
+    try {
+        await fs.access(inputFile);
+    } catch {
+        console.error(`ERROR: File not found: ${inputFile}`);
+        process.exit(1);
+    }
+
+    const analysis = await analyzer.analyzeFile(inputFile);
+    const jailerConditions = analyzer.generateJailerConditions(analysis);
+
+    // Output JSON for shell script consumption
+    console.log(JSON.stringify({
+        tables: analysis.tables,
+        queryCount: analysis.queryCount,
+        conditions: jailerConditions
+    }, null, 2));
 }
 
 async function runGenerate(args) {
