@@ -49,11 +49,16 @@ echo "=== Step 5: Export data ==="
   -e "${OUTPUT_SQL}" \
   -format SQL \
   -scope LOCAL_DATABASE \
+  -local-database-storage "${SEEDIFY_DIR}/tmp" \
   -use-rowid-if-needed \
   org.postgresql.Driver \
   "${JDBC_URL}" \
   "${DB_USER}" \
   "${DB_PASSWORD}"
+
+echo "=== Step 6: Cleanup ==="
+rm -rf "${SEEDIFY_DIR}/tmp"
+echo "  Removed temp files"
 
 echo "=== Done! ==="
 echo "Output: ${OUTPUT_SQL}"

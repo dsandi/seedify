@@ -275,9 +275,10 @@ ${firstCond.table}; ${firstCond.condition}
 
     try {
         // Use -scope LOCAL_DATABASE to avoid creating temp tables in source DB (for read-only users)
+        // Use -local-database-storage to keep temp files in .seedify instead of system /tmp
         // Use -use-rowid-if-needed to handle tables without primary keys (uses PostgreSQL ctid)
-        // Jailer CLI uses positional args: <extraction-model> <driver> <url> <user> <password>
-        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -scope LOCAL_DATABASE -use-rowid-if-needed org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        const localDbPath = path.join(seedifyDir, 'tmp');
+        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -scope LOCAL_DATABASE -local-database-storage "${localDbPath}" -use-rowid-if-needed org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
         if (options.debug) log.info(`CMD: ${extractCmd.replace(options.dbPassword, '***')}`);
 
         execSync(extractCmd, {
