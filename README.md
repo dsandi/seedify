@@ -78,10 +78,20 @@ const analysis = await seedify.analyzeFile('.seedify/queries.jsonl');
 
 ## Supported Patterns
 
-- `WHERE id = $1`
-- `WHERE id IN ($1, $2)`
-- `WHERE id = ANY($1)`
-- `WHERE table.column = 'value'`
+| Pattern | Example |
+|---------|---------|
+| Equality | `WHERE id = $1` |
+| Table-qualified | `WHERE table.column = $1` |
+| IN clause | `WHERE id IN ($1, $2, $3)` |
+| NOT IN | `WHERE status NOT IN ($1, $2)` |
+| ANY (array) | `WHERE id = ANY($1)` |
+| Comparison | `WHERE amount >= $1`, `<=`, `>`, `<`, `!=`, `<>` |
+| BETWEEN | `WHERE date BETWEEN $1 AND $2` |
+| LIKE / ILIKE | `WHERE name LIKE $1` |
+| IS NULL | `WHERE deleted_at IS NULL` |
+| IS NOT NULL | `WHERE verified_at IS NOT NULL` |
+| String literals | `WHERE username = 'alice'` |
+| Numeric literals | `WHERE status = 1` |
 
 ## License
 

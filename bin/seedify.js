@@ -199,8 +199,9 @@ async function runGenerate(args) {
     const dataModelDir = path.join(seedifyDir, 'datamodel');
 
     try {
-        // Clean up existing datamodel to avoid stale schema data
+        // Clean up existing datamodel and extraction model to avoid stale data
         await fs.rm(dataModelDir, { recursive: true, force: true }).catch(() => { });
+        await fs.rm(path.join(seedifyDir, 'extraction.csv'), { force: true }).catch(() => { });
         await fs.mkdir(dataModelDir, { recursive: true });
 
         // jailer.sh is patched during install to include PostgreSQL driver
@@ -239,7 +240,8 @@ ${firstCond.table}; ${firstCond.condition}
     await fs.writeFile(extractionModelPath, extractionModel);
 
     try {
-        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        // Use -scope LOCAL to avoid creating temp tables in source database (for read-only users)
+        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -scope LOCAL org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
 
         execSync(extractCmd, {
             cwd: seedifyDir,
