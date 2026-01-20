@@ -196,15 +196,29 @@ async function runGenerate(args) {
     const tempDir = path.join(require('os').tmpdir(), 'seedify-' + Date.now());
     const dataModelDir = path.join(tempDir, 'datamodel');
 
+    // Build classpath including all jars from Jailer's lib directory
+    const libDir = path.join(JAILER_HOME, 'lib');
+    const classpath = `${libDir}/*`;
+
     try {
         await fs.mkdir(tempDir, { recursive: true });
 
-        // Syntax: build-model [-datamodel <dir>] <driver> <url> <user> <password>
-        const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        // Call Java directly with explicit classpath to include PostgreSQL driver
+        const buildArgs = [
+            '-Xmx1024M',
+            '-cp', classpath,
+            'net.sf.jailer.Jailer',
+            'build-model',
+            '-datamodel', dataModelDir,
+            'org.postgresql.Driver',
+            jdbcUrl,
+            options.dbUser,
+            options.dbPassword
+        ];
+        const buildCmd = `java ${buildArgs.map(a => `"${a}"`).join(' ')}`;
         execSync(buildCmd, {
             cwd: JAILER_HOME,
-            stdio: 'pipe',
-            env: { ...process.env, JAVA_OPTS: '-Xmx1024M' }
+            stdio: 'pipe'
         });
         log.success('Database model built');
     } catch (e) {
@@ -224,14 +238,27 @@ async function runGenerate(args) {
     await fs.mkdir(path.dirname(outputFileAbs), { recursive: true }).catch(() => { });
 
     try {
-        // Syntax: export [options] <subject> <driver> <url> <user> <password>
-        // Options: -datamodel <dir> -e <outfile> -where <cond> -format SQL
-        const extractCmd = `"${jailerPath}" export -datamodel "${dataModelDir}" -e "${outputFileAbs}" -where "${firstCond.condition}" -format SQL "${firstCond.table}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        // Call Java directly with explicit classpath
+        const extractArgs = [
+            '-Xmx1024M',
+            '-cp', classpath,
+            'net.sf.jailer.Jailer',
+            'export',
+            '-datamodel', dataModelDir,
+            '-e', outputFileAbs,
+            '-where', firstCond.condition,
+            '-format', 'SQL',
+            firstCond.table,
+            'org.postgresql.Driver',
+            jdbcUrl,
+            options.dbUser,
+            options.dbPassword
+        ];
+        const extractCmd = `java ${extractArgs.map(a => `"${a}"`).join(' ')}`;
 
         execSync(extractCmd, {
             cwd: JAILER_HOME,
-            stdio: 'pipe',
-            env: { ...process.env, JAVA_OPTS: '-Xmx1024M' }
+            stdio: 'pipe'
         });
 
         const stat = await fs.stat(outputFileAbs);
@@ -251,7 +278,7 @@ async function runGenerate(args) {
     // Cleanup
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
 
-    log.footer('Done! Seeder file generated successfully.');
+    log.footer('Done! Seeder file generated successfully!');
 }
 
 function parseArgs(args) {
