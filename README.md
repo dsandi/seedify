@@ -67,7 +67,6 @@ seedify check                               # Check environment
 | `--db-name` | Database name (required) |
 | `--db-user` | Database username (required) |
 | `--db-password` | Database password |
-| `--db-ssl` | Enable SSL (for self-signed certificates) |
 
 ## API
 

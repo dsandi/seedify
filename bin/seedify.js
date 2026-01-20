@@ -303,7 +303,7 @@ function parseArgs(args) {
 
 async function runInstall() {
     log.header('Seedify - Installing Jailer');
-    log.init(3);
+    log.init(4);
 
     // Step 1: Check Java
     log.stepStart('Checking Java installation...');
@@ -332,7 +332,7 @@ async function runInstall() {
         log.info('Not installed, proceeding...');
     }
 
-    // Step 3: Download and install
+    // Step 3: Download and install Jailer
     log.stepStart(`Downloading Jailer ${JAILER_VERSION}...`);
 
     const downloadUrl = `https://github.com/Wisser/Jailer/releases/download/v${JAILER_VERSION}/jailer_${JAILER_VERSION}.zip`;
@@ -343,7 +343,7 @@ async function runInstall() {
         log.info(`URL: ${downloadUrl}`);
 
         execSync(`curl -L "${downloadUrl}" -o "${zipPath}"`, { stdio: 'pipe' });
-        log.success('Downloaded');
+        log.success('Downloaded Jailer');
 
         log.info('Extracting...');
         execSync(`unzip -o "${zipPath}" -d "${JAILER_HOME}"`, { stdio: 'pipe' });
@@ -395,7 +395,36 @@ async function runInstall() {
         process.exit(1);
     }
 
-    log.footer('Jailer installed successfully!');
+    // Step 4: Download PostgreSQL JDBC driver
+    log.stepStart('Downloading PostgreSQL JDBC driver...');
+
+    const pgDriverVersion = '42.7.4';
+    const pgDriverUrl = `https://jdbc.postgresql.org/download/postgresql-${pgDriverVersion}.jar`;
+    const libDir = path.join(JAILER_HOME, 'lib');
+    const driverPath = path.join(libDir, `postgresql-${pgDriverVersion}.jar`);
+
+    try {
+        await fs.mkdir(libDir, { recursive: true });
+        log.info(`URL: ${pgDriverUrl}`);
+
+        execSync(`curl -L "${pgDriverUrl}" -o "${driverPath}"`, { stdio: 'pipe' });
+
+        // Verify driver was downloaded
+        const stat = await fs.stat(driverPath);
+        if (stat.size < 100000) {
+            throw new Error('Driver file too small, download may have failed');
+        }
+
+        log.success(`PostgreSQL driver installed: postgresql-${pgDriverVersion}.jar`);
+    } catch (e) {
+        log.error(`Failed to download PostgreSQL driver: ${e.message}`);
+        log.info('You can manually download from:');
+        log.info(`  ${pgDriverUrl}`);
+        log.info(`And place in: ${libDir}`);
+        process.exit(1);
+    }
+
+    log.footer('Jailer + PostgreSQL driver installed successfully!');
 }
 
 async function runCheck() {
