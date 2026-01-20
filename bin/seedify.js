@@ -205,8 +205,8 @@ async function runGenerate(args) {
         await fs.mkdir(dataModelDir, { recursive: true });
 
         // jailer.sh is patched during install to include PostgreSQL driver
-        // Use explicit flags instead of positional arguments for reliability
-        const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" -jdbcdriver org.postgresql.Driver -url "${jdbcUrl}" -user "${options.dbUser}" -password "${options.dbPassword}"`;
+        // Jailer CLI uses positional args: <driver> <url> <user> <password>
+        const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
         if (options.debug) log.info(`CMD: ${buildCmd.replace(options.dbPassword, '***')}`);
         execSync(buildCmd, {
             cwd: seedifyDir,
@@ -241,8 +241,9 @@ ${firstCond.table}; ${firstCond.condition}
     await fs.writeFile(extractionModelPath, extractionModel);
 
     try {
-        // Use explicit flags for reliability, use local database storage to avoid temp tables in source DB
-        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -local-database-storage -jdbcdriver org.postgresql.Driver -url "${jdbcUrl}" -user "${options.dbUser}" -password "${options.dbPassword}"`;
+        // Use -scope LOCAL_DATABASE to avoid creating temp tables in source DB (for read-only users)
+        // Jailer CLI uses positional args: <extraction-model> <driver> <url> <user> <password>
+        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -scope LOCAL_DATABASE org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
         if (options.debug) log.info(`CMD: ${extractCmd.replace(options.dbPassword, '***')}`);
 
         execSync(extractCmd, {
