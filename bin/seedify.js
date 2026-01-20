@@ -105,7 +105,7 @@ Usage:
 
 Generate Options:
   <queries.jsonl>         Captured queries file (required)
-  -o, --output <file>     Output SQL file (default: ./output/seed.sql)
+  -o, --output <file>     Output SQL file (default: .seedify/seed.sql)
   --db-url <url>          PostgreSQL URL (e.g., postgresql://user:pass@host/db)
   --db-host <host>        Database host (default: localhost)
   --db-port <port>        Database port (default: 5432)
@@ -199,6 +199,8 @@ async function runGenerate(args) {
     const dataModelDir = path.join(seedifyDir, 'datamodel');
 
     try {
+        // Clean up existing datamodel to avoid stale schema data
+        await fs.rm(dataModelDir, { recursive: true, force: true }).catch(() => { });
         await fs.mkdir(dataModelDir, { recursive: true });
 
         // jailer.sh is patched during install to include PostgreSQL driver
@@ -221,11 +223,23 @@ async function runGenerate(args) {
     const firstCond = jailerConditions[0];
     log.info(`Subject: ${firstCond.table} WHERE ${firstCond.condition}`);
 
-    const outputFileAbs = path.resolve(options.outputFile);
+    // Output goes to .seedify directory by default
+    const outputFileAbs = options.outputFile.startsWith('./')
+        ? path.join(seedifyDir, path.basename(options.outputFile))
+        : path.resolve(options.outputFile);
     await fs.mkdir(path.dirname(outputFileAbs), { recursive: true }).catch(() => { });
 
+    // Create extraction model file (.jm) that Jailer expects
+    const extractionModelPath = path.join(seedifyDir, 'extraction.jm');
+    const extractionModel = `<?xml version="1.0" encoding="UTF-8"?>
+<jailer-extraction-model>
+    <subject>${firstCond.table}</subject>
+    <condition>${firstCond.condition}</condition>
+</jailer-extraction-model>`;
+    await fs.writeFile(extractionModelPath, extractionModel);
+
     try {
-        const extractCmd = `"${jailerPath}" export -datamodel "${dataModelDir}" -e "${outputFileAbs}" -where "${firstCond.condition}" -format SQL "${firstCond.table}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
 
         execSync(extractCmd, {
             cwd: seedifyDir,
@@ -236,7 +250,7 @@ async function runGenerate(args) {
         const content = await fs.readFile(outputFileAbs, 'utf-8');
         const lines = content.split('\n').length;
 
-        log.success(`Generated: ${options.outputFile}`);
+        log.success(`Generated: ${outputFileAbs}`);
         log.success(`Size: ${(stat.size / 1024).toFixed(1)} KB (${lines} lines)`);
     } catch (e) {
         log.error('Jailer extraction failed');
@@ -251,7 +265,7 @@ async function runGenerate(args) {
 function parseArgs(args) {
     const options = {
         inputFile: null,
-        outputFile: './output/seed.sql',
+        outputFile: './seed.sql',  // Will be placed in .seedify directory
         dbHost: process.env.DB_HOST || 'localhost',
         dbPort: process.env.DB_PORT || '5432',
         dbName: process.env.DB_NAME || null,

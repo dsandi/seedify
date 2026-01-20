@@ -45,7 +45,7 @@ npx seedify generate ./queries.jsonl \
   --db-password secret
 ```
 
-Output: `./output/seed.sql`
+Output: `.seedify/seed.sql`
 
 ## CLI Commands
 
@@ -60,7 +60,7 @@ seedify check                               # Check environment
 
 | Option | Description |
 |--------|-------------|
-| `-o, --output` | Output SQL file (default: `./output/seed.sql`) |
+| `-o, --output` | Output SQL file (default: `.seedify/seed.sql`) |
 | `--db-url` | PostgreSQL URL (e.g., `postgresql://user:pass@host/db`) |
 | `--db-host` | Database host (default: `localhost`) |
 | `--db-port` | Database port (default: `5432`) |
