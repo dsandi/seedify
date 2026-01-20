@@ -51,6 +51,11 @@ const log = {
         console.error(`  ✗ ${msg}`);
     },
 
+    cmd(command, password) {
+        const masked = password ? command.replace(password, '***') : command;
+        console.log(`  → ${masked}`);
+    },
+
     header(msg) {
         console.log(`\n${'='.repeat(50)}`);
         console.log(`  ${msg}`);
@@ -116,11 +121,13 @@ Generate Options:
   --db-name <name>        Database name (required)
   --db-user <user>        Database user (required)
   --db-password <pass>    Database password
+  --local-scope           Use LOCAL_DATABASE scope (stores temp files in .seedify/tmp)
   --debug                 Show verbose Jailer output
 
 Examples:
   seedify generate ./queries.jsonl --db-name mydb --db-user postgres
   seedify generate ./queries.jsonl --db-url postgresql://user:pass@host/db
+  seedify generate ./queries.jsonl --local-scope
   seedify analyze .seedify/queries.jsonl
 `);
 }
@@ -240,7 +247,7 @@ async function runGenerate(args) {
         // jailer.sh is patched during install to include PostgreSQL driver
         // Jailer CLI uses positional args: <driver> <url> <user> <password>
         const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
-        if (options.debug) log.info(`CMD: ${buildCmd.replace(options.dbPassword, '***')}`);
+        log.cmd(buildCmd, options.dbPassword);
         execSync(buildCmd, {
             cwd: seedifyDir,
             stdio: options.debug ? 'inherit' : 'pipe'
@@ -274,12 +281,18 @@ ${firstCond.table}; ${firstCond.condition}
     await fs.writeFile(extractionModelPath, extractionModel);
 
     try {
-        // Use -scope LOCAL_DATABASE to avoid creating temp tables in source DB (for read-only users)
-        // Use -local-database-storage to keep temp files in .seedify instead of system /tmp
+        // Build export command with optional local scope flags
         // Use -use-rowid-if-needed to handle tables without primary keys (uses PostgreSQL ctid)
-        const localDbPath = path.join(seedifyDir, 'tmp');
-        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -scope LOCAL_DATABASE -local-database-storage "${localDbPath}" -use-rowid-if-needed org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
-        if (options.debug) log.info(`CMD: ${extractCmd.replace(options.dbPassword, '***')}`);
+        let extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL`;
+
+        // Add local scope flags if requested
+        if (options.localScope) {
+            const localDbPath = path.join(seedifyDir, 'tmp');
+            extractCmd += ` -scope LOCAL_DATABASE -local-database-storage "${localDbPath}"`;
+        }
+
+        extractCmd += ` -use-rowid-if-needed org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        log.cmd(extractCmd, options.dbPassword);
 
         execSync(extractCmd, {
             cwd: seedifyDir,
@@ -293,8 +306,10 @@ ${firstCond.table}; ${firstCond.condition}
         log.success(`Generated: ${outputFileAbs}`);
         log.success(`Size: ${(stat.size / 1024).toFixed(1)} KB (${lines} lines)`);
 
-        // Clean up temp files
-        await fs.rm(path.join(seedifyDir, 'tmp'), { recursive: true, force: true }).catch(() => { });
+        // Clean up temp files if local scope was used
+        if (options.localScope) {
+            await fs.rm(path.join(seedifyDir, 'tmp'), { recursive: true, force: true }).catch(() => { });
+        }
     } catch (e) {
         log.error('Jailer extraction failed');
         log.info(e.message);
@@ -314,6 +329,7 @@ function parseArgs(args) {
         dbName: process.env.DB_NAME || null,
         dbUser: process.env.DB_USER || null,
         dbPassword: process.env.DB_PASSWORD || '',
+        localScope: false,
         debug: false
     };
 
@@ -347,6 +363,7 @@ function parseArgs(args) {
             case '--db-name': options.dbName = next; i++; break;
             case '--db-user': options.dbUser = next; i++; break;
             case '--db-password': options.dbPassword = next; i++; break;
+            case '--local-scope': options.localScope = true; break;
             case '--debug': options.debug = true; break;
         }
     }

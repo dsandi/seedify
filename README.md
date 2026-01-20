@@ -61,7 +61,10 @@ seedify check                               # Check environment
 | `--db-name` | Database name (required) |
 | `--db-user` | Database username (required) |
 | `--db-password` | Database password |
+| `--local-scope` | Use LOCAL_DATABASE scope (stores temp files in `.seedify/tmp`) |
 | `--debug` | Show verbose Jailer output for troubleshooting |
+
+> **Note**: Use `--local-scope` when connecting with a read-only database user to avoid creating temp tables in the source database.
 
 ## API
 
