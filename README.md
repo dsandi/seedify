@@ -61,6 +61,7 @@ seedify check                               # Check environment
 | `--db-name` | Database name (required) |
 | `--db-user` | Database username (required) |
 | `--db-password` | Database password |
+| `--debug` | Show verbose Jailer output for troubleshooting |
 
 ## API
 

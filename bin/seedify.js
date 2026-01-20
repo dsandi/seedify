@@ -205,11 +205,12 @@ async function runGenerate(args) {
         await fs.mkdir(dataModelDir, { recursive: true });
 
         // jailer.sh is patched during install to include PostgreSQL driver
-        // Run from seedifyDir so all relative paths are consistent
-        const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        // Use explicit flags instead of positional arguments for reliability
+        const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" -jdbcdriver org.postgresql.Driver -url "${jdbcUrl}" -user "${options.dbUser}" -password "${options.dbPassword}"`;
+        if (options.debug) log.info(`CMD: ${buildCmd.replace(options.dbPassword, '***')}`);
         execSync(buildCmd, {
             cwd: seedifyDir,
-            stdio: 'pipe'
+            stdio: options.debug ? 'inherit' : 'pipe'
         });
         log.success('Database model built');
     } catch (e) {
@@ -240,12 +241,13 @@ ${firstCond.table}; ${firstCond.condition}
     await fs.writeFile(extractionModelPath, extractionModel);
 
     try {
-        // Use -local-database-storage to avoid creating temp tables in source database (for read-only users)
-        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -local-database-storage org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
+        // Use explicit flags for reliability, use local database storage to avoid temp tables in source DB
+        const extractCmd = `"${jailerPath}" export "${extractionModelPath}" -datamodel "${dataModelDir}" -e "${outputFileAbs}" -format SQL -local-database-storage -jdbcdriver org.postgresql.Driver -url "${jdbcUrl}" -user "${options.dbUser}" -password "${options.dbPassword}"`;
+        if (options.debug) log.info(`CMD: ${extractCmd.replace(options.dbPassword, '***')}`);
 
         execSync(extractCmd, {
             cwd: seedifyDir,
-            stdio: 'pipe'
+            stdio: options.debug ? 'inherit' : 'pipe'
         });
 
         const stat = await fs.stat(outputFileAbs);
@@ -272,7 +274,8 @@ function parseArgs(args) {
         dbPort: process.env.DB_PORT || '5432',
         dbName: process.env.DB_NAME || null,
         dbUser: process.env.DB_USER || null,
-        dbPassword: process.env.DB_PASSWORD || ''
+        dbPassword: process.env.DB_PASSWORD || '',
+        debug: false
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -305,6 +308,7 @@ function parseArgs(args) {
             case '--db-name': options.dbName = next; i++; break;
             case '--db-user': options.dbUser = next; i++; break;
             case '--db-password': options.dbPassword = next; i++; break;
+            case '--debug': options.debug = true; break;
         }
     }
 
