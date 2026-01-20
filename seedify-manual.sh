@@ -49,6 +49,7 @@ echo "=== Step 5: Export data ==="
   -e "${OUTPUT_SQL}" \
   -format SQL \
   -scope LOCAL_DATABASE \
+  -use-rowid-if-needed \
   org.postgresql.Driver \
   "${JDBC_URL}" \
   "${DB_USER}" \
