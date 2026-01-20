@@ -196,29 +196,32 @@ async function runGenerate(args) {
     const tempDir = path.join(require('os').tmpdir(), 'seedify-' + Date.now());
     const dataModelDir = path.join(tempDir, 'datamodel');
 
-    // Build classpath including all jars from Jailer's lib directory
+    // Add PostgreSQL driver to classpath via environment variable
     const libDir = path.join(JAILER_HOME, 'lib');
-    const classpath = `${libDir}/*`;
+    const pgDriver = path.join(libDir, 'postgresql-42.7.4.jar');
+    const jailerJar = path.join(JAILER_HOME, 'jailer.jar');
+
+    // Build custom CLASSPATH that includes the PostgreSQL driver
+    const existingClasspath = process.env.CLASSPATH || '';
+    const classpathSep = process.platform === 'win32' ? ';' : ':';
+    const newClasspath = existingClasspath
+        ? `${pgDriver}${classpathSep}${existingClasspath}`
+        : pgDriver;
+
+    const jailerEnv = {
+        ...process.env,
+        CLASSPATH: newClasspath
+    };
 
     try {
         await fs.mkdir(tempDir, { recursive: true });
 
-        // Call Java directly with explicit classpath to include PostgreSQL driver
-        const buildArgs = [
-            '-Xmx1024M',
-            '-cp', classpath,
-            'net.sf.jailer.Jailer',
-            'build-model',
-            '-datamodel', dataModelDir,
-            'org.postgresql.Driver',
-            jdbcUrl,
-            options.dbUser,
-            options.dbPassword
-        ];
-        const buildCmd = `java ${buildArgs.map(a => `"${a}"`).join(' ')}`;
+        // Use jailer.sh with CLASSPATH env var that includes PostgreSQL driver
+        const buildCmd = `"${jailerPath}" build-model -datamodel "${dataModelDir}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
         execSync(buildCmd, {
             cwd: JAILER_HOME,
-            stdio: 'pipe'
+            stdio: 'pipe',
+            env: jailerEnv
         });
         log.success('Database model built');
     } catch (e) {
@@ -238,27 +241,13 @@ async function runGenerate(args) {
     await fs.mkdir(path.dirname(outputFileAbs), { recursive: true }).catch(() => { });
 
     try {
-        // Call Java directly with explicit classpath
-        const extractArgs = [
-            '-Xmx1024M',
-            '-cp', classpath,
-            'net.sf.jailer.Jailer',
-            'export',
-            '-datamodel', dataModelDir,
-            '-e', outputFileAbs,
-            '-where', firstCond.condition,
-            '-format', 'SQL',
-            firstCond.table,
-            'org.postgresql.Driver',
-            jdbcUrl,
-            options.dbUser,
-            options.dbPassword
-        ];
-        const extractCmd = `java ${extractArgs.map(a => `"${a}"`).join(' ')}`;
+        // Use jailer.sh with CLASSPATH env var
+        const extractCmd = `"${jailerPath}" export -datamodel "${dataModelDir}" -e "${outputFileAbs}" -where "${firstCond.condition}" -format SQL "${firstCond.table}" org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
 
         execSync(extractCmd, {
             cwd: JAILER_HOME,
-            stdio: 'pipe'
+            stdio: 'pipe',
+            env: jailerEnv
         });
 
         const stat = await fs.stat(outputFileAbs);
