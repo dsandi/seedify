@@ -62,9 +62,11 @@ seedify check                               # Check environment
 | `--db-user` | Database username (required) |
 | `--db-password` | Database password |
 | `--local-scope` | Use LOCAL_DATABASE scope (stores temp files in `.seedify/tmp`) |
+| `--all-associations` | Follow all associations (default: dependencies only) |
+| `--row-limit <n>` | Maximum rows to export (safety limit) |
 | `--debug` | Show verbose Jailer output for troubleshooting |
 
-> **Note**: Use `--local-scope` when connecting with a read-only database user to avoid creating temp tables in the source database.
+> **Note**: By default, seedify exports only **dependency associations** (foreign key relationships) to minimize data. Use `--all-associations` to include all related data. Use `--local-scope` when connecting with a read-only database user.
 
 ## API
 

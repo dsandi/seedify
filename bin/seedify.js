@@ -122,6 +122,8 @@ Generate Options:
   --db-user <user>        Database user (required)
   --db-password <pass>    Database password
   --local-scope           Use LOCAL_DATABASE scope (stores temp files in .seedify/tmp)
+  --all-associations      Follow all associations (default: dependencies only)
+  --row-limit <n>         Maximum rows to export (safety limit)
   --debug                 Show verbose Jailer output
 
 Examples:
@@ -259,6 +261,33 @@ async function runGenerate(args) {
         process.exit(1);
     }
 
+    // Parse association.csv to find non-dependency associations (for dependencies-only mode)
+    let nonDependencyAssociations = [];
+    if (!options.allAssociations) {
+        const associationCsvPath = path.join(dataModelDir, 'association.csv');
+        try {
+            const csvContent = await fs.readFile(associationCsvPath, 'utf-8');
+            const lines = csvContent.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('#') || line.trim() === '') continue;
+                // Format: TableA; TableB; dependency; cardinality; join-condition; name
+                const parts = line.split(';').map(p => p.trim());
+                if (parts.length >= 6) {
+                    const dependency = parts[2]; // A, B, or empty
+                    const associationName = parts[5];
+                    if (dependency === '' && associationName) {
+                        nonDependencyAssociations.push(associationName);
+                    }
+                }
+            }
+            if (nonDependencyAssociations.length > 0) {
+                log.success(`Dependencies-only mode: disabled ${nonDependencyAssociations.length} non-dependency associations`);
+            }
+        } catch (e) {
+            log.info('Could not parse associations, using all associations');
+        }
+    }
+
     // Step 4: Extract subset
     log.stepStart('Extracting database subset...');
 
@@ -272,12 +301,21 @@ async function runGenerate(args) {
     await fs.mkdir(path.dirname(outputFileAbs), { recursive: true }).catch(() => { });
 
     // Create extraction model file (.csv) that Jailer expects
-    // Format: subject table on first line, where condition on second line
+    // Format: subject table on first line, then optional restrictions
     const extractionModelPath = path.join(seedifyDir, 'extraction.csv');
-    const extractionModel = `# Seedify extraction model
+    let extractionModel = `# Seedify extraction model
 # subject; where
 ${firstCond.table}; ${firstCond.condition}
 `;
+
+    // Add restrictions for non-dependency associations (dependencies-only mode)
+    if (nonDependencyAssociations.length > 0) {
+        extractionModel += `\n# Restrictions (dependencies-only mode)\n`;
+        for (const assocName of nonDependencyAssociations) {
+            extractionModel += `${assocName}; false\n`;
+        }
+    }
+
     await fs.writeFile(extractionModelPath, extractionModel);
 
     try {
@@ -289,6 +327,11 @@ ${firstCond.table}; ${firstCond.condition}
         if (options.localScope) {
             const localDbPath = path.join(seedifyDir, 'tmp');
             extractCmd += ` -scope LOCAL_DATABASE -local-database-storage "${localDbPath}"`;
+        }
+
+        // Add row limit if specified
+        if (options.rowLimit) {
+            extractCmd += ` -row-limit ${options.rowLimit}`;
         }
 
         extractCmd += ` -use-rowid-if-needed org.postgresql.Driver "${jdbcUrl}" "${options.dbUser}" "${options.dbPassword}"`;
@@ -330,6 +373,8 @@ function parseArgs(args) {
         dbUser: process.env.DB_USER || null,
         dbPassword: process.env.DB_PASSWORD || '',
         localScope: false,
+        allAssociations: false,
+        rowLimit: null,
         debug: false
     };
 
@@ -364,6 +409,8 @@ function parseArgs(args) {
             case '--db-user': options.dbUser = next; i++; break;
             case '--db-password': options.dbPassword = next; i++; break;
             case '--local-scope': options.localScope = true; break;
+            case '--all-associations': options.allAssociations = true; break;
+            case '--row-limit': options.rowLimit = next; i++; break;
             case '--debug': options.debug = true; break;
         }
     }
